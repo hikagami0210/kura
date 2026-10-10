@@ -1,0 +1,21 @@
+image: node:22.20.0-bookworm-slim
+
+stages:
+  - test
+  - deploy
+
+check:
+  stage: test
+  script:
+    - npm ci
+    - npm run check
+
+create-pages:
+  stage: deploy
+  script:
+    - npm ci
+    - npm run build
+  pages:
+    publish: dist/site
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_PIPELINE_SOURCE == "web"'

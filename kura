@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+KURA_ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+case "${1:-}" in
+ generate) shift; exec "$KURA_ROOT/node_modules/.bin/tsx" "$KURA_ROOT/scripts/generate.ts" "$@" ;;
+ build) shift; exec "$KURA_ROOT/node_modules/.bin/tsx" "$KURA_ROOT/scripts/rebuild.ts" "$@" ;;
+ edit) shift; exec "$KURA_ROOT/node_modules/.bin/tsx" "$KURA_ROOT/scripts/edit.ts" "$@" ;;
+ demo) shift; exec "$KURA_ROOT/node_modules/.bin/tsx" "$KURA_ROOT/scripts/demo.ts" "$@" ;;
+ *) echo 'Usage: ./kura generate --config config.json | ./kura build --config config.json | ./kura edit --config config.json | ./kura demo' >&2; exit 1 ;;
+esac

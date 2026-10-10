@@ -1,0 +1,6 @@
+{
+  "connectionEnv": "KURA_DATABASE_URL",
+  "schemas": ["public", "master", "audit", "reporting"],
+  "output": "../.local/viewer",
+  "annotationsFile": "../.local/annotations.json"
+}

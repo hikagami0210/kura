@@ -1,0 +1,947 @@
+{
+  "formatVersion": 1,
+  "name": "Commerce DB",
+  "environment": "demo",
+  "capturedAt": "2026-10-09T09:00:00+09:00",
+  "databases": [
+    {
+      "name": "commerce",
+      "schemas": [
+        {
+          "name": "public",
+          "tables": [
+            {
+              "name": "orders",
+              "description": "注文情報。顧客、注文状態、支払方法を管理します。",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "uuid",
+                  "nullable": false,
+                  "pk": true,
+                  "description": "注文ID"
+                },
+                {
+                  "name": "customer_id",
+                  "type": "uuid",
+                  "nullable": false,
+                  "description": "顧客ID"
+                },
+                {
+                  "name": "status_code",
+                  "type": "varchar(32)",
+                  "nullable": false,
+                  "default": "pending",
+                  "description": "注文状態コード"
+                },
+                {
+                  "name": "payment_method_code",
+                  "type": "varchar(32)",
+                  "nullable": false,
+                  "description": "支払方法コード"
+                },
+                {
+                  "name": "total_amount",
+                  "type": "numeric(12,2)",
+                  "nullable": false,
+                  "description": "注文金額"
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamptz",
+                  "nullable": false,
+                  "default": "now()",
+                  "description": "作成日時"
+                }
+              ],
+              "relations": [
+                {
+                  "column": "customer_id",
+                  "table": "customers",
+                  "target": "id",
+                  "schema": "public"
+                },
+                {
+                  "column": "status_code",
+                  "table": "order_statuses",
+                  "target": "code",
+                  "schema": "master"
+                },
+                {
+                  "column": "payment_method_code",
+                  "table": "payment_methods",
+                  "target": "code",
+                  "schema": "master"
+                }
+              ],
+              "indexes": [
+                {
+                  "name": "orders_pkey",
+                  "method": "btree",
+                  "keys": ["id"],
+                  "primary": true,
+                  "unique": true,
+                  "valid": true,
+                  "include": [],
+                  "definition": "CREATE UNIQUE INDEX orders_pkey ON public.orders USING btree (id)"
+                },
+                {
+                  "name": "orders_customer_created_idx",
+                  "method": "btree",
+                  "keys": ["customer_id", "created_at DESC"],
+                  "primary": false,
+                  "unique": false,
+                  "valid": true,
+                  "include": ["total_amount"],
+                  "definition": "CREATE INDEX orders_customer_created_idx ON public.orders USING btree (customer_id, created_at DESC) INCLUDE (total_amount)"
+                },
+                {
+                  "name": "orders_pending_idx",
+                  "method": "btree",
+                  "keys": ["created_at"],
+                  "primary": false,
+                  "unique": false,
+                  "valid": true,
+                  "include": [],
+                  "predicate": "status_code = 'pending'",
+                  "definition": "CREATE INDEX orders_pending_idx ON public.orders USING btree (created_at) WHERE status_code = 'pending'"
+                }
+              ]
+            },
+            {
+              "name": "customers",
+              "description": "顧客情報。注文の購入者を識別するためのテーブルです。",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "uuid",
+                  "nullable": false,
+                  "pk": true,
+                  "description": "顧客ID"
+                },
+                {
+                  "name": "display_name",
+                  "type": "varchar(120)",
+                  "nullable": false,
+                  "description": "表示名"
+                },
+                {
+                  "name": "created_at",
+                  "type": "timestamptz",
+                  "nullable": false,
+                  "default": "now()",
+                  "description": "作成日時"
+                }
+              ],
+              "relations": [],
+              "indexes": [
+                {
+                  "name": "customers_pkey",
+                  "method": "btree",
+                  "keys": ["id"],
+                  "primary": true,
+                  "unique": true,
+                  "valid": true,
+                  "include": [],
+                  "definition": "CREATE UNIQUE INDEX customers_pkey ON public.customers USING btree (id)"
+                }
+              ]
+            },
+            {
+              "name": "active_orders",
+              "kind": "view",
+              "description": "処理中の注文を顧客名付きで参照するビュー（デモ）。",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "uuid",
+                  "nullable": false
+                },
+                {
+                  "name": "customer_name",
+                  "type": "varchar(120)",
+                  "nullable": false
+                },
+                {
+                  "name": "total_amount",
+                  "type": "numeric(12,2)",
+                  "nullable": false
+                }
+              ],
+              "relations": [],
+              "definition": "SELECT o.id, c.display_name AS customer_name, o.total_amount FROM public.orders o JOIN public.customers c ON c.id = o.customer_id WHERE o.status_code = 'processing';",
+              "dependencies": [
+                {
+                  "schema": "public",
+                  "name": "orders"
+                },
+                {
+                  "schema": "public",
+                  "name": "customers"
+                }
+              ]
+            }
+          ],
+          "owner": "commerce_owner"
+        },
+        {
+          "name": "master",
+          "tables": [
+            {
+              "name": "order_statuses",
+              "description": "注文の状態を定義するマスター。orders.status_code から参照されます。",
+              "columns": [
+                {
+                  "name": "code",
+                  "type": "varchar(32)",
+                  "nullable": false,
+                  "pk": true,
+                  "description": "注文状態コード"
+                },
+                {
+                  "name": "name",
+                  "type": "varchar(80)",
+                  "nullable": false,
+                  "description": "表示名"
+                },
+                {
+                  "name": "sort_order",
+                  "type": "integer",
+                  "nullable": false,
+                  "default": "0",
+                  "description": "表示順"
+                },
+                {
+                  "name": "description",
+                  "type": "text",
+                  "nullable": true,
+                  "description": "表示確認用の追加カラム：description"
+                },
+                {
+                  "name": "external_reference",
+                  "type": "text",
+                  "nullable": true,
+                  "description": "表示確認用の追加カラム：external_reference"
+                },
+                {
+                  "name": "metadata",
+                  "type": "jsonb",
+                  "nullable": true,
+                  "description": "表示確認用の追加カラム：metadata"
+                },
+                {
+                  "name": "operator_notes",
+                  "type": "text",
+                  "nullable": true,
+                  "description": "表示確認用の追加カラム：operator_notes"
+                },
+                {
+                  "name": "display_name_en",
+                  "type": "text",
+                  "nullable": true,
+                  "description": "表示確認用の追加カラム：display_name_en"
+                },
+                {
+                  "name": "category",
+                  "type": "text",
+                  "nullable": true,
+                  "description": "表示確認用の追加カラム：category"
+                },
+                {
+                  "name": "valid_from",
+                  "type": "text",
+                  "nullable": true,
+                  "description": "表示確認用の追加カラム：valid_from"
+                },
+                {
+                  "name": "valid_until",
+                  "type": "text",
+                  "nullable": true,
+                  "description": "表示確認用の追加カラム：valid_until"
+                },
+                {
+                  "name": "updated_by",
+                  "type": "text",
+                  "nullable": true,
+                  "description": "表示確認用の追加カラム：updated_by"
+                }
+              ],
+              "relations": [],
+              "master": {
+                "complete": true,
+                "columns": [
+                  "code",
+                  "name",
+                  "sort_order",
+                  "description",
+                  "external_reference",
+                  "metadata",
+                  "operator_notes",
+                  "display_name_en",
+                  "category",
+                  "valid_from",
+                  "valid_until",
+                  "updated_by"
+                ],
+                "rows": [
+                  {
+                    "code": "pending",
+                    "name": "受付待ち",
+                    "sort_order": 10,
+                    "description": "マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。",
+                    "external_reference": "https://example.invalid/reference/very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_",
+                    "metadata": {
+                      "label": "受付待ち",
+                      "description": "JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。",
+                      "tags": [
+                        "tag_0",
+                        "tag_1",
+                        "tag_2",
+                        "tag_3",
+                        "tag_4",
+                        "tag_5",
+                        "tag_6",
+                        "tag_7",
+                        "tag_8",
+                        "tag_9",
+                        "tag_10",
+                        "tag_11",
+                        "tag_12",
+                        "tag_13",
+                        "tag_14",
+                        "tag_15",
+                        "tag_16",
+                        "tag_17",
+                        "tag_18",
+                        "tag_19"
+                      ]
+                    },
+                    "operator_notes": "確認項目1：改行を含む運用メモ。\n確認項目2：改行を含む運用メモ。\n確認項目3：改行を含む運用メモ。\n確認項目4：改行を含む運用メモ。\n確認項目5：改行を含む運用メモ。\n確認項目6：改行を含む運用メモ。\n確認項目7：改行を含む運用メモ。\n確認項目8：改行を含む運用メモ。\n確認項目9：改行を含む運用メモ。\n確認項目10：改行を含む運用メモ。\n確認項目11：改行を含む運用メモ。\n確認項目12：改行を含む運用メモ。",
+                    "display_name_en": "Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending Status display name pending ",
+                    "category": "order",
+                    "valid_from": "2026-01-01",
+                    "valid_until": null,
+                    "updated_by": "demo_operator"
+                  },
+                  {
+                    "code": "processing",
+                    "name": "処理中",
+                    "sort_order": 20,
+                    "description": "マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。",
+                    "external_reference": "https://example.invalid/reference/very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_",
+                    "metadata": {
+                      "label": "処理中",
+                      "description": "JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。",
+                      "tags": [
+                        "tag_0",
+                        "tag_1",
+                        "tag_2",
+                        "tag_3",
+                        "tag_4",
+                        "tag_5",
+                        "tag_6",
+                        "tag_7",
+                        "tag_8",
+                        "tag_9",
+                        "tag_10",
+                        "tag_11",
+                        "tag_12",
+                        "tag_13",
+                        "tag_14",
+                        "tag_15",
+                        "tag_16",
+                        "tag_17",
+                        "tag_18",
+                        "tag_19"
+                      ]
+                    },
+                    "operator_notes": "確認項目1：改行を含む運用メモ。\n確認項目2：改行を含む運用メモ。\n確認項目3：改行を含む運用メモ。\n確認項目4：改行を含む運用メモ。\n確認項目5：改行を含む運用メモ。\n確認項目6：改行を含む運用メモ。\n確認項目7：改行を含む運用メモ。\n確認項目8：改行を含む運用メモ。\n確認項目9：改行を含む運用メモ。\n確認項目10：改行を含む運用メモ。\n確認項目11：改行を含む運用メモ。\n確認項目12：改行を含む運用メモ。",
+                    "display_name_en": "Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing Status display name processing ",
+                    "category": "order",
+                    "valid_from": "2026-01-01",
+                    "valid_until": null,
+                    "updated_by": "demo_operator"
+                  },
+                  {
+                    "code": "completed",
+                    "name": "完了",
+                    "sort_order": 30,
+                    "description": "マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。",
+                    "external_reference": "https://example.invalid/reference/very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_",
+                    "metadata": {
+                      "label": "完了",
+                      "description": "JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。",
+                      "tags": [
+                        "tag_0",
+                        "tag_1",
+                        "tag_2",
+                        "tag_3",
+                        "tag_4",
+                        "tag_5",
+                        "tag_6",
+                        "tag_7",
+                        "tag_8",
+                        "tag_9",
+                        "tag_10",
+                        "tag_11",
+                        "tag_12",
+                        "tag_13",
+                        "tag_14",
+                        "tag_15",
+                        "tag_16",
+                        "tag_17",
+                        "tag_18",
+                        "tag_19"
+                      ]
+                    },
+                    "operator_notes": "確認項目1：改行を含む運用メモ。\n確認項目2：改行を含む運用メモ。\n確認項目3：改行を含む運用メモ。\n確認項目4：改行を含む運用メモ。\n確認項目5：改行を含む運用メモ。\n確認項目6：改行を含む運用メモ。\n確認項目7：改行を含む運用メモ。\n確認項目8：改行を含む運用メモ。\n確認項目9：改行を含む運用メモ。\n確認項目10：改行を含む運用メモ。\n確認項目11：改行を含む運用メモ。\n確認項目12：改行を含む運用メモ。",
+                    "display_name_en": "Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed Status display name completed ",
+                    "category": "order",
+                    "valid_from": "2026-01-01",
+                    "valid_until": null,
+                    "updated_by": "demo_operator"
+                  },
+                  {
+                    "code": "cancelled",
+                    "name": "キャンセル",
+                    "sort_order": 40,
+                    "description": "マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。マスターデータの長文を折り返し、一覧の高さを抑えながら全文も確認できることを検証します。",
+                    "external_reference": "https://example.invalid/reference/very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_very_long_identifier_without_spaces_",
+                    "metadata": {
+                      "label": "キャンセル",
+                      "description": "JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。JSONの中にも長い説明文を持つケース。",
+                      "tags": [
+                        "tag_0",
+                        "tag_1",
+                        "tag_2",
+                        "tag_3",
+                        "tag_4",
+                        "tag_5",
+                        "tag_6",
+                        "tag_7",
+                        "tag_8",
+                        "tag_9",
+                        "tag_10",
+                        "tag_11",
+                        "tag_12",
+                        "tag_13",
+                        "tag_14",
+                        "tag_15",
+                        "tag_16",
+                        "tag_17",
+                        "tag_18",
+                        "tag_19"
+                      ]
+                    },
+                    "operator_notes": "確認項目1：改行を含む運用メモ。\n確認項目2：改行を含む運用メモ。\n確認項目3：改行を含む運用メモ。\n確認項目4：改行を含む運用メモ。\n確認項目5：改行を含む運用メモ。\n確認項目6：改行を含む運用メモ。\n確認項目7：改行を含む運用メモ。\n確認項目8：改行を含む運用メモ。\n確認項目9：改行を含む運用メモ。\n確認項目10：改行を含む運用メモ。\n確認項目11：改行を含む運用メモ。\n確認項目12：改行を含む運用メモ。",
+                    "display_name_en": "Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled Status display name cancelled ",
+                    "category": "order",
+                    "valid_from": "2026-01-01",
+                    "valid_until": null,
+                    "updated_by": "demo_operator"
+                  }
+                ]
+              },
+              "notes": [
+                {
+                  "key": "pending",
+                  "text": "注文受付後、処理が始まる前の状態。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。 根拠が不十分な説明は確認済みと区別して表示します。",
+                  "source": "LLMによる説明案（デモ）",
+                  "confirmed": false
+                },
+                {
+                  "key": "processing",
+                  "text": "注文の処理を進めている状態。具体的な開始条件は確認が必要。",
+                  "source": "LLMによる説明案（デモ）",
+                  "confirmed": false
+                },
+                {
+                  "key": "completed",
+                  "text": "注文の処理が完了した状態。完了を判定する条件は確認が必要。",
+                  "source": "LLMによる説明案（デモ）",
+                  "confirmed": false
+                },
+                {
+                  "key": "cancelled",
+                  "text": "注文が取り消された状態。",
+                  "source": "LLMによる説明案（デモ）",
+                  "confirmed": false
+                }
+              ],
+              "indexes": [
+                {
+                  "name": "order_statuses_pkey",
+                  "method": "btree",
+                  "keys": ["code"],
+                  "primary": true,
+                  "unique": true,
+                  "valid": true,
+                  "include": [],
+                  "definition": "CREATE UNIQUE INDEX order_statuses_pkey ON master.order_statuses USING btree (code)"
+                }
+              ]
+            },
+            {
+              "name": "payment_methods",
+              "description": "注文時に選択できる支払方法のマスター。",
+              "columns": [
+                {
+                  "name": "code",
+                  "type": "varchar(32)",
+                  "nullable": false,
+                  "pk": true,
+                  "description": "支払方法コード"
+                },
+                {
+                  "name": "name",
+                  "type": "varchar(80)",
+                  "nullable": false,
+                  "description": "表示名"
+                },
+                {
+                  "name": "enabled",
+                  "type": "boolean",
+                  "nullable": false,
+                  "default": "true",
+                  "description": "利用可能フラグ"
+                }
+              ],
+              "relations": [],
+              "master": {
+                "complete": true,
+                "columns": ["code", "name", "enabled"],
+                "rows": [
+                  {
+                    "code": "credit_card",
+                    "name": "クレジットカード",
+                    "enabled": true
+                  },
+                  {
+                    "code": "bank_transfer",
+                    "name": "銀行振込",
+                    "enabled": true
+                  },
+                  {
+                    "code": "cash_on_delivery",
+                    "name": "代金引換",
+                    "enabled": false
+                  }
+                ]
+              },
+              "notes": [],
+              "indexes": [
+                {
+                  "name": "payment_methods_pkey",
+                  "method": "btree",
+                  "keys": ["code"],
+                  "primary": true,
+                  "unique": true,
+                  "valid": true,
+                  "include": [],
+                  "definition": "CREATE UNIQUE INDEX payment_methods_pkey ON master.payment_methods USING btree (code)"
+                }
+              ]
+            }
+          ],
+          "owner": "commerce_owner"
+        },
+        {
+          "name": "audit",
+          "tables": [
+            {
+              "name": "order_events",
+              "description": "注文イベントの履歴。注文IDはアプリケーションで参照しますが、外部キー制約は定義されていません。",
+              "columns": [
+                {
+                  "name": "id",
+                  "type": "bigint",
+                  "nullable": false,
+                  "pk": true,
+                  "description": "イベントID"
+                },
+                {
+                  "name": "order_id",
+                  "type": "uuid",
+                  "nullable": false,
+                  "description": "参照する注文ID"
+                },
+                {
+                  "name": "event_type",
+                  "type": "text",
+                  "nullable": false,
+                  "description": "イベント種別"
+                }
+              ],
+              "relations": [
+                {
+                  "column": "order_id",
+                  "schema": "public",
+                  "table": "orders",
+                  "target": "id",
+                  "kind": "logical",
+                  "confirmed": false,
+                  "source": "名前・型の一致（デモ）",
+                  "description": "アプリのJOIN条件や仕様で確認する候補。DBによる参照整合性の保証はありません。"
+                }
+              ],
+              "indexes": [
+                {
+                  "name": "order_events_pkey",
+                  "method": "btree",
+                  "keys": ["id"],
+                  "primary": true,
+                  "unique": true,
+                  "valid": true,
+                  "include": [],
+                  "definition": "CREATE UNIQUE INDEX order_events_pkey ON audit.order_events USING btree (id)"
+                }
+              ]
+            }
+          ],
+          "owner": "commerce_owner"
+        },
+        {
+          "name": "reporting",
+          "owner": "commerce_owner",
+          "tables": [
+            {
+              "name": "order_totals",
+              "kind": "materialized_view",
+              "description": "顧客別の注文金額集計（デモ）。",
+              "columns": [
+                {
+                  "name": "customer_id",
+                  "type": "uuid",
+                  "nullable": true
+                },
+                {
+                  "name": "total",
+                  "type": "numeric",
+                  "nullable": true
+                }
+              ],
+              "relations": [],
+              "definition": "SELECT customer_id, SUM(total_amount) AS total FROM public.orders GROUP BY customer_id;",
+              "dependencies": [
+                {
+                  "schema": "public",
+                  "name": "orders"
+                }
+              ],
+              "populated": true,
+              "indexes": [
+                {
+                  "name": "order_totals_customer_idx",
+                  "method": "btree",
+                  "keys": ["customer_id"],
+                  "primary": false,
+                  "unique": true,
+                  "valid": true,
+                  "include": [],
+                  "definition": "CREATE UNIQUE INDEX order_totals_customer_idx ON reporting.order_totals (customer_id)"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "info": {
+        "serverVersion": "17.6（デモ）",
+        "owner": "commerce_owner",
+        "encoding": "UTF8",
+        "collation": "ja_JP.UTF-8",
+        "ctype": "ja_JP.UTF-8",
+        "size": "128 MB",
+        "connectionLimit": -1,
+        "timezone": "Asia/Tokyo",
+        "searchPath": "\"$user\", public",
+        "currentUser": "docs_reader",
+        "recovery": false,
+        "extensions": [
+          {
+            "name": "plpgsql",
+            "version": "1.0",
+            "schema": "pg_catalog"
+          },
+          {
+            "name": "pg_trgm",
+            "version": "1.6",
+            "schema": "public"
+          }
+        ]
+      },
+      "access": [
+        {
+          "role": "app_user",
+          "schema": "public",
+          "table": "orders",
+          "connect": true,
+          "usage": true,
+          "select": true,
+          "insert": true,
+          "update": true,
+          "delete": false,
+          "via": "app_readwrite（継承）",
+          "rls": "有効・ポリシー未評価"
+        },
+        {
+          "role": "app_user",
+          "schema": "public",
+          "table": "customers",
+          "connect": true,
+          "usage": true,
+          "select": true,
+          "insert": true,
+          "update": true,
+          "delete": false,
+          "via": "app_readwrite（継承）",
+          "rls": "無効"
+        },
+        {
+          "role": "app_user",
+          "schema": "master",
+          "table": "order_statuses",
+          "connect": true,
+          "usage": true,
+          "select": true,
+          "insert": false,
+          "update": false,
+          "delete": false,
+          "via": "PUBLIC",
+          "rls": "無効"
+        },
+        {
+          "role": "app_user",
+          "schema": "master",
+          "table": "payment_methods",
+          "connect": true,
+          "usage": true,
+          "select": true,
+          "insert": false,
+          "update": false,
+          "delete": false,
+          "via": "PUBLIC",
+          "rls": "無効"
+        },
+        {
+          "role": "docs_reader",
+          "schema": "public",
+          "table": "orders",
+          "connect": true,
+          "usage": true,
+          "select": true,
+          "insert": false,
+          "update": false,
+          "delete": false,
+          "via": "report_reader（継承）",
+          "rls": "有効・ポリシー未評価"
+        },
+        {
+          "role": "docs_reader",
+          "schema": "public",
+          "table": "customers",
+          "connect": true,
+          "usage": true,
+          "select": false,
+          "insert": false,
+          "update": false,
+          "delete": false,
+          "via": "未付与",
+          "rls": "無効"
+        },
+        {
+          "role": "docs_reader",
+          "schema": "master",
+          "table": "order_statuses",
+          "connect": true,
+          "usage": true,
+          "select": true,
+          "insert": false,
+          "update": false,
+          "delete": false,
+          "via": "PUBLIC",
+          "rls": "無効"
+        },
+        {
+          "role": "docs_reader",
+          "schema": "master",
+          "table": "payment_methods",
+          "connect": true,
+          "usage": true,
+          "select": true,
+          "insert": false,
+          "update": false,
+          "delete": false,
+          "via": "PUBLIC",
+          "rls": "無効"
+        }
+      ],
+      "schemaAccess": [
+        {
+          "role": "app_user",
+          "schema": "public",
+          "connect": true,
+          "usage": true,
+          "create": false,
+          "via": "app_readwrite（継承、デモ）"
+        },
+        {
+          "role": "docs_reader",
+          "schema": "public",
+          "connect": true,
+          "usage": true,
+          "create": false,
+          "via": "report_reader（継承、デモ）"
+        },
+        {
+          "role": "commerce_owner",
+          "schema": "public",
+          "connect": true,
+          "usage": true,
+          "create": true,
+          "via": "所有者（デモ）"
+        },
+        {
+          "role": "app_user",
+          "schema": "master",
+          "connect": true,
+          "usage": true,
+          "create": false,
+          "via": "app_readwrite（継承、デモ）"
+        },
+        {
+          "role": "docs_reader",
+          "schema": "master",
+          "connect": true,
+          "usage": true,
+          "create": false,
+          "via": "report_reader（継承、デモ）"
+        },
+        {
+          "role": "commerce_owner",
+          "schema": "master",
+          "connect": true,
+          "usage": true,
+          "create": true,
+          "via": "所有者（デモ）"
+        },
+        {
+          "role": "app_user",
+          "schema": "audit",
+          "connect": true,
+          "usage": true,
+          "create": false,
+          "via": "app_readwrite（継承、デモ）"
+        },
+        {
+          "role": "docs_reader",
+          "schema": "audit",
+          "connect": true,
+          "usage": false,
+          "create": false,
+          "via": "未付与"
+        },
+        {
+          "role": "commerce_owner",
+          "schema": "audit",
+          "connect": true,
+          "usage": true,
+          "create": true,
+          "via": "所有者（デモ）"
+        }
+      ]
+    },
+    {
+      "name": "analytics",
+      "schemas": [
+        {
+          "name": "reporting",
+          "tables": [
+            {
+              "name": "orders",
+              "description": "注文集計のサンプル。commerceの注文テーブルとは別のテーブルです。",
+              "columns": [
+                {
+                  "name": "report_date",
+                  "type": "date",
+                  "nullable": false,
+                  "pk": true,
+                  "description": "集計日"
+                },
+                {
+                  "name": "order_count",
+                  "type": "integer",
+                  "nullable": false,
+                  "description": "注文数"
+                }
+              ],
+              "relations": [],
+              "indexes": [
+                {
+                  "name": "orders_pkey",
+                  "method": "btree",
+                  "keys": ["report_date"],
+                  "primary": true,
+                  "unique": true,
+                  "valid": true,
+                  "include": [],
+                  "definition": "CREATE UNIQUE INDEX orders_pkey ON reporting.orders USING btree (report_date)"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "info": {
+        "serverVersion": "17.6（デモ）",
+        "owner": "analytics_owner",
+        "encoding": "UTF8",
+        "size": "42 MB",
+        "extensions": [
+          {
+            "name": "plpgsql",
+            "version": "1.0",
+            "schema": "pg_catalog"
+          }
+        ]
+      }
+    }
+  ],
+  "roles": [
+    {
+      "name": "app_readwrite",
+      "login": false,
+      "superuser": false,
+      "inherit": true,
+      "memberships": []
+    },
+    {
+      "name": "app_user",
+      "login": true,
+      "superuser": false,
+      "inherit": true,
+      "memberships": ["app_readwrite"]
+    },
+    {
+      "name": "docs_reader",
+      "login": true,
+      "superuser": false,
+      "inherit": true,
+      "memberships": ["report_reader"]
+    },
+    {
+      "name": "report_reader",
+      "login": false,
+      "superuser": false,
+      "inherit": true,
+      "memberships": []
+    },
+    {
+      "name": "commerce_owner",
+      "login": false,
+      "superuser": false,
+      "inherit": true,
+      "memberships": []
+    }
+  ]
+}

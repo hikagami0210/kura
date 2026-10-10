@@ -1,0 +1,21 @@
+{
+  "formatVersion": 1,
+  "entries": [
+    {
+      "target": {
+        "kind": "database",
+        "database": "commerce"
+      },
+      "description": "## 受注管理のデータベース\n\n顧客・注文・決済方法を管理する、架空のサンプルです。\n\n- **public**：受注業務のテーブル\n- **master**：注文状態と決済方法のマスター\n- **audit**：注文イベントの記録\n\nテーブル間の参照、アクセス権限、マスターデータを確認できます。権限・値はすべてデモ用です。"
+    },
+    {
+      "target": {
+        "kind": "table",
+        "database": "commerce",
+        "schema": "master",
+        "table": "order_statuses"
+      },
+      "description": "### 注文状態のマスター\n\n`public.orders.status_code` が参照する状態コードを管理します。\n\n- コードはアプリケーションの分岐にも使用します。\n- 状態を追加するときは、画面表示と状態遷移の処理も確認してください。\n\nこれはコメントの書き方を示すサンプルです。"
+    }
+  ]
+}

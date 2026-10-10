@@ -1,0 +1,29 @@
+{
+  "connectionEnv": "KURA_DATABASE_URL",
+  "environment": "kura-test",
+  "schemas": ["public", "master", "audit", "reporting"],
+  "roles": ["kura_admin", "kura_app", "kura_reader", "kura_readonly"],
+  "masters": [
+    {
+      "schema": "master",
+      "table": "order_statuses",
+      "columns": ["code", "name", "sort_order"],
+      "orderBy": ["sort_order", "code"],
+      "limit": 100
+    }
+  ],
+  "logicalRelations": [
+    {
+      "schema": "audit",
+      "table": "order_events",
+      "column": "order_id",
+      "targetSchema": "public",
+      "targetTable": "orders",
+      "targetColumn": "id",
+      "confirmed": true,
+      "source": "テストDBの設計",
+      "description": "履歴保存を優先し、外部キー制約を設けず注文IDを記録する。"
+    }
+  ],
+  "output": "../../dist/demo"
+}

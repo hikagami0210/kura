@@ -1,0 +1,43 @@
+{
+  "name": "kura",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PostgreSQLの構造・権限・マスターデータを見渡す静的ドキュメント生成ツール",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.viewer.json",
+    "build": "tsx scripts/build.ts",
+    "check": "npm run lint && npm run fmt:check && npm run typecheck && tsx scripts/check.ts && tsx scripts/check-annotations.ts",
+    "demo": "tsx scripts/demo.ts",
+    "generate": "tsx scripts/generate.ts",
+    "lint": "oxlint --deny-warnings .",
+    "lint:fix": "oxlint --fix --deny-warnings .",
+    "fmt": "oxfmt --write .",
+    "fmt:check": "oxfmt --check .",
+    "edit": "tsx scripts/edit.ts",
+    "check:annotations": "tsx scripts/check-annotations.ts"
+  },
+  "dependencies": {
+    "@panzoom/panzoom": "4.6.2",
+    "lucide-static": "1.54.0",
+    "markdown-it": "15.0.2",
+    "mermaid": "12.1.0",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/jsdom": "30.0.0",
+    "@types/markdown-it": "14.2.0",
+    "@types/node": "26.6.5",
+    "@types/pg": "8.23.1",
+    "esbuild": "0.28.2",
+    "jsdom": "26.1.0",
+    "oxfmt": "0.72.0",
+    "oxlint": "1.87.0",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
